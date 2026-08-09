@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "ERIC-IDE: Python and Ruby IDE for HarmonyOS"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "ERIC-IDE Main Ability"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "ERIC-IDE"
+    },
+    {
+      "name": "app_name",
+      "value": "ERIC-IDE"
+    }
+  ]
+}

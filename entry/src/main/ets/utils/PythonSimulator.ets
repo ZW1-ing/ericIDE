@@ -580,22 +580,23 @@ export class PythonSimulator {
           if (lines[p].trim().length > 0) { prevTrimmed = lines[p].trim(); break; }
         }
         if (!prevTrimmed.endsWith(':') && trimmed.length > 0) {
-          return 'IndentationError: line ' + (i + 1).toString() + ' - 意外的缩进，上一行不是复合语句';
+          return 'IndentationError: line ' + (i + 1).toString() + ':1 - 意外的缩进，上一行不是复合语句';
         }
       }
 
-      // 冒号检查：复合语句必须以冒号结尾
+      // 冒号检查
       let compoundStarts: string[] = ['if ', 'elif ', 'else', 'for ', 'while ', 'def ', 'class ', 'try', 'except', 'finally', 'with '];
       let isCompound: boolean = false;
       for (let k of compoundStarts) {
         if (trimmed.startsWith(k)) { isCompound = true; break; }
       }
       if (isCompound && !trimmed.endsWith(':')) {
-        return 'SyntaxError: line ' + (i + 1).toString() + ' - 复合语句缺少冒号 :';
+        return 'SyntaxError: line ' + (i + 1).toString() + ':' + trimmed.length.toString() + ' - 复合语句缺少冒号 :';
       }
 
-      // 引号检查
+      // 括号和引号检查
       let inStr: string = '';
+      let lastBracketCol: number = 0;
       for (let j = 0; j < trimmed.length; j++) {
         let ch: string = trimmed[j];
         if (inStr.length > 0) {
@@ -606,33 +607,32 @@ export class PythonSimulator {
           inStr = ch;
           openQuotes++;
         } else if (ch === '(') {
-          openParens++;
+          openParens++; lastBracketCol = j + 1;
         } else if (ch === ')') {
           openParens--;
+          if (openParens < 0) return 'SyntaxError: line ' + (i + 1).toString() + ':' + (j + 1).toString() + ' - 多余的右括号 )';
         } else if (ch === '[') {
-          openBrackets++;
+          openBrackets++; lastBracketCol = j + 1;
         } else if (ch === ']') {
           openBrackets--;
+          if (openBrackets < 0) return 'SyntaxError: line ' + (i + 1).toString() + ':' + (j + 1).toString() + ' - 多余的右方括号 ]';
         } else if (ch === '{') {
-          openBraces++;
+          openBraces++; lastBracketCol = j + 1;
         } else if (ch === '}') {
           openBraces--;
+          if (openBraces < 0) return 'SyntaxError: line ' + (i + 1).toString() + ':' + (j + 1).toString() + ' - 多余的右花括号 }';
         }
       }
       if (inStr.length > 0) {
-        return 'SyntaxError: line ' + (i + 1).toString() + ' - 字符串引号未闭合';
+        return 'SyntaxError: line ' + (i + 1).toString() + ':1 - 字符串引号未闭合';
       }
-
-      if (openParens < 0) return 'SyntaxError: line ' + (i + 1).toString() + ' - 多余的右括号 )';
-      if (openBrackets < 0) return 'SyntaxError: line ' + (i + 1).toString() + ' - 多余的右方括号 ]';
-      if (openBraces < 0) return 'SyntaxError: line ' + (i + 1).toString() + ' - 多余的右花括号 }';
 
       lastIndent = indent;
     }
 
-    if (openParens > 0) return 'SyntaxError: line ' + lines.length.toString() + ' - 缺少 ' + openParens.toString() + ' 个右括号 )';
-    if (openBrackets > 0) return 'SyntaxError: line ' + lines.length.toString() + ' - 缺少 ' + openBrackets.toString() + ' 个右方括号 ]';
-    if (openBraces > 0) return 'SyntaxError: line ' + lines.length.toString() + ' - 缺少 ' + openBraces.toString() + ' 个右花括号 }';
+    if (openParens > 0) return 'SyntaxError: line 1:' + lastBracketCol.toString() + ' - 缺少 ' + openParens.toString() + ' 个右括号 )';
+    if (openBrackets > 0) return 'SyntaxError: line 1:' + lastBracketCol.toString() + ' - 缺少 ' + openBrackets.toString() + ' 个右方括号 ]';
+    if (openBraces > 0) return 'SyntaxError: line 1:' + lastBracketCol.toString() + ' - 缺少 ' + openBraces.toString() + ' 个右花括号 }';
 
     return null;
   }

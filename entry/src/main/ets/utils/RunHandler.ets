@@ -18,63 +18,24 @@ export class RunHandler {
       let errors: ErrorEntry[] = RunHandler.parseErrors(output, code);
 
       if (errors.length > 0) {
-        result += '═══════════════════════════════════════\n';
-        result += '✗ ' + errors.length.toString() + ' 个错误\n';
-        result += '═══════════════════════════════════════\n';
+        let lines: string[] = code.split('\n');
+        result += 'Traceback (most recent call last):\n';
         for (let i = 0; i < errors.length; i++) {
           let e: ErrorEntry = errors[i];
-          let lines: string[] = code.split('\n');
+          result += '  File "<input>", line ' + e.line.toString();
+          if (e.column > 0) result += ', column ' + e.column.toString();
           result += '\n';
-          result += '错误 ' + (i + 1).toString() + ': ' + e.errorType + '\n';
-          result += '───────────────────────────────────────\n';
-
-          // 上下文：上一行
-          if (e.line > 1 && e.line - 2 < lines.length) {
-            result += '  ' + (e.line - 1).toString() + ' │ ' + lines[e.line - 2] + '\n';
+          if (e.line > 0 && e.line <= lines.length) {
+            result += '    ' + lines[e.line - 1].trim() + '\n';
           }
-
-          // 错误行
-          if (e.line <= lines.length) {
-            result += '▶ ' + e.line.toString() + ' │ ' + lines[e.line - 1] + '\n';
-          }
-
-          // 错误指示
           if (e.column > 0) {
             let pointer: string = '    ';
-            let lineNumWidth: number = e.line.toString().length;
-            for (let p = 0; p < lineNumWidth + 3 + e.column - 1; p++) {
-              pointer += ' ';
-            }
-            pointer += '^── ' + e.message;
-            result += pointer + '\n';
-          } else {
-            result += '    ' + e.message + '\n';
+            for (let p = 1; p < e.column; p++) pointer += ' ';
+            pointer += '^\n';
+            result += pointer;
           }
-
-          // 上下文：下一行
-          if (e.line < lines.length) {
-            result += '  ' + (e.line + 1).toString() + ' │ ' + lines[e.line] + '\n';
-          }
-
-          // 修复提示
-          if (e.errorType === 'SyntaxError') {
-            if (e.message.includes('parenthesis') || e.message.includes('括号')) {
-              result += '  💡 检查括号是否配对\n';
-            } else if (e.message.includes('colon') || e.message.includes('冒号')) {
-              result += '  💡 语句末尾需要加冒号 :\n';
-            } else {
-              result += '  💡 检查语法是否正确\n';
-            }
-          } else if (e.errorType === 'IndentationError') {
-            result += '  💡 检查缩进是否统一，建议使用4个空格\n';
-          } else if (e.errorType === 'NameError') {
-            result += '  💡 变量未定义，请检查拼写或先赋值\n';
-          } else if (e.errorType === 'TypeError') {
-            result += '  💡 类型不匹配，检查运算或函数参数\n';
-          } else if (e.errorType === 'RuntimeError') {
-            result += '  💡 运行时出错，检查逻辑和数据\n';
-          }
-          result += '\n';
+          result += e.errorType + ': ' + e.message + '\n';
+          if (i < errors.length - 1) result += '\n';
         }
         result += '═══════════════════════════════════════\n';
         result += '共 ' + errors.length.toString() + ' 个错误 | 耗时 ' + elapsed.toString() + 'ms\n';
@@ -122,67 +83,62 @@ export class RunHandler {
   static parseErrors(output: string, code: string): ErrorEntry[] {
     let errors: ErrorEntry[] = [];
 
-    // 语法错误
-    let syntaxMatch: RegExpMatchArray | null = output.match(/SyntaxError:\s*line\s*(\d+)\s*-\s*(.+)/i);
+    // 语法错误 - 支持 line:col 格式
+    let syntaxMatch: RegExpMatchArray | null = output.match(/SyntaxError:\s*line\s*(\d+):?(\d+)?\s*-\s*(.+)/i);
     if (syntaxMatch !== null) {
       let e: ErrorEntry = new ErrorEntry();
       e.errorType = 'SyntaxError';
       e.line = parseInt(syntaxMatch[1]);
-      e.column = 0;
-      e.message = syntaxMatch[2].trim();
+      e.column = syntaxMatch[2] !== undefined ? parseInt(syntaxMatch[2]) : 0;
+      e.message = syntaxMatch[3].trim();
       e.source = RunHandler.getLine(code, e.line);
       errors.push(e);
     }
 
-    // 缩进错误
-    let indentMatch: RegExpMatchArray | null = output.match(/IndentationError:\s*line\s*(\d+)\s*-\s*(.+)/i);
+    let indentMatch: RegExpMatchArray | null = output.match(/IndentationError:\s*line\s*(\d+):?(\d+)?\s*-\s*(.+)/i);
     if (indentMatch !== null) {
       let e: ErrorEntry = new ErrorEntry();
       e.errorType = 'IndentationError';
       e.line = parseInt(indentMatch[1]);
-      e.column = 0;
-      e.message = indentMatch[2].trim();
+      e.column = indentMatch[2] !== undefined ? parseInt(indentMatch[2]) : 0;
+      e.message = indentMatch[3].trim();
       e.source = RunHandler.getLine(code, e.line);
       errors.push(e);
     }
 
-    // 运行时错误
-    let runtimeMatch: RegExpMatchArray | null = output.match(/RuntimeError:\s*line\s*(\d+)\s*-\s*(.+)/i);
+    let runtimeMatch: RegExpMatchArray | null = output.match(/RuntimeError:\s*line\s*(\d+):?(\d+)?\s*-\s*(.+)/i);
     if (runtimeMatch !== null) {
       let e: ErrorEntry = new ErrorEntry();
       e.errorType = 'RuntimeError';
       e.line = parseInt(runtimeMatch[1]);
-      e.column = 0;
-      e.message = runtimeMatch[2].trim();
+      e.column = runtimeMatch[2] !== undefined ? parseInt(runtimeMatch[2]) : 0;
+      e.message = runtimeMatch[3].trim();
       e.source = RunHandler.getLine(code, e.line);
       errors.push(e);
     }
 
-    // 名称错误 (NameError)
-    let nameMatch: RegExpMatchArray | null = output.match(/NameError:\s*line\s*(\d+)\s*-\s*(.+)/i);
+    let nameMatch: RegExpMatchArray | null = output.match(/NameError:\s*line\s*(\d+):?(\d+)?\s*-\s*(.+)/i);
     if (nameMatch !== null) {
       let e: ErrorEntry = new ErrorEntry();
       e.errorType = 'NameError';
       e.line = parseInt(nameMatch[1]);
-      e.column = 0;
-      e.message = nameMatch[2].trim();
+      e.column = nameMatch[2] !== undefined ? parseInt(nameMatch[2]) : 0;
+      e.message = nameMatch[3].trim();
       e.source = RunHandler.getLine(code, e.line);
       errors.push(e);
     }
 
-    // 类型错误 (TypeError)
-    let typeMatch: RegExpMatchArray | null = output.match(/TypeError:\s*line\s*(\d+)\s*-\s*(.+)/i);
+    let typeMatch: RegExpMatchArray | null = output.match(/TypeError:\s*line\s*(\d+):?(\d+)?\s*-\s*(.+)/i);
     if (typeMatch !== null) {
       let e: ErrorEntry = new ErrorEntry();
       e.errorType = 'TypeError';
       e.line = parseInt(typeMatch[1]);
-      e.column = 0;
-      e.message = typeMatch[2].trim();
+      e.column = typeMatch[2] !== undefined ? parseInt(typeMatch[2]) : 0;
+      e.message = typeMatch[3].trim();
       e.source = RunHandler.getLine(code, e.line);
       errors.push(e);
     }
 
-    // 通用错误 (带行号)
     let genericMatch: RegExpMatchArray | null = output.match(/错误:\s*line\s*(\d+)\s*-\s*(.+)/i);
     if (genericMatch !== null && errors.length === 0) {
       let e: ErrorEntry = new ErrorEntry();

@@ -566,6 +566,7 @@ export class PythonSimulator {
     let openBrackets: number = 0;
     let openBraces: number = 0;
     let openQuotes: number = 0;
+    let lastBracketCol: number = 0;
     let lastIndent: number = 0;
 
     for (let i = 0; i < lines.length; i++) {
@@ -596,7 +597,6 @@ export class PythonSimulator {
 
       // 括号和引号检查
       let inStr: string = '';
-      let lastBracketCol: number = 0;
       for (let j = 0; j < trimmed.length; j++) {
         let ch: string = trimmed[j];
         if (inStr.length > 0) {

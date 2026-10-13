@@ -179,38 +179,212 @@ EricPC/
     └── libpython3.13.so         # 交叉编译的 Python 引擎
 ```
 
-## 四、软件迁移能力（T0 / T1 / T2 阶段）
+## 四、ArkTS 开发细节
 
-本项目按照三个阶段推进软件迁移：
+### 4.1 状态管理：@State / @Prop / @Link
 
-| 阶段 | 目标 | 状态 |
-|------|------|------|
-| **T0** | UI 复刻完成，ArkTS 模拟器可运行基础 Python | ✅ 已完成 |
-| **T1** | CPython 原生引擎集成，支持真实 Python 执行 | ✅ 已完成 |
-| **T2** | 完整 IDE 功能（调试器、插件系统、文件持久化） | 🔄 进行中 |
+ArkTS 使用装饰器管理组件状态，这是与传统 TypeScript 最大的差异之一。
 
-### T0 阶段：UI 复刻 — ✅ 已完成
+| 装饰器 | 方向 | 用途 |
+|--------|------|------|
+| `@State` | 组件内部 | 声明本地状态，驱动 UI 刷新 |
+| `@Prop` | 父 → 子（单向） | 接收父组件数据，子组件改动不回传 |
+| `@Link` | 父 ↔ 子（双向） | 双向绑定，子组件改动会同步父组件 |
 
-- 完整的 Eric6 风格 IDE 布局（14 个 ArkTS 组件）
-- ArkTS 端 Python 模拟器（支持 print、变量、函数、循环、条件）
-- 文件树管理、标签页管理、撤销/重做
+以终端面板为例，运行结果需要从主页面传递到终端组件，且终端可能需要更新滚动位置，因此使用 `@Link`：
 
-### T1 阶段：原生引擎集成 — ✅ 已完成
+```typescript
+// 主页面（父组件）
+BottomPanel({ consoleEntries: $consoleEntries })
 
-- CPython 3.13 for aarch64-linux-ohos 交叉编译成功
-- NAPI 桥接层实现 ArkTS ↔ CPython 双向通信
-- Base64 编码安全传递代码，支持 f-string、列表推导式等复杂语法
+// 终端组件（子组件）
+@Component
+export struct BottomPanel {
+  @Link consoleEntries: ConsoleEntry[]
+  // ...
+}
+```
 
-### T2 阶段：完整 IDE 功能 — 🔄 进行中
+**踩坑记录**：最初使用 `@Prop` 传递运行结果数组，发现点击运行后终端没有任何反应。原因是 `@Prop` 是单向同步，且对自定义类数组的变更检测不敏感。改用 `@Link` 后问题解决。
 
-- 文件持久化（HarmonyOS 分布式文件系统）
-- 调试器（断点、单步执行、变量查看）
-- 插件系统
-- Ruby 运行时集成
+### 4.2 组件通信与事件回调
 
-## 五、PC 适配要点
+子组件不能直接修改父组件状态，需要通过回调函数上抛事件：
 
-### 5.1 设备类型声明
+```typescript
+// 子组件声明回调
+@Component
+export struct ToolBar {
+  onRun: () => void = () => {}
+  // 点击运行按钮时
+  // this.onRun()
+}
+
+// 父组件传入实现
+ToolBar({
+  onRun: () => { this.doRun() }
+})
+```
+
+### 4.3 ArkTS 的语法限制
+
+ArkTS 是 TypeScript 的超集，但比标准 TypeScript 严格得多：
+
+- **禁止 `any` / `unknown`**：所有类型必须显式声明
+- **禁止 catch 子句类型注解**：只能写 `catch (e)`，不能写 `catch (e: Error)`
+- **`@Entry` 组件只能有一个根节点**：且必须是容器组件
+- **部分 Web 属性不可用**：如 `selectable`、`wordWrap`、`cursorColor`
+
+示例（正确的 ArkTS 写法）：
+
+```typescript
+// 错误：catch (e: Error)
+// 正确：
+try {
+  let result: string = RunHandler.execute(code, Language.PYTHON);
+} catch (e) {
+  let msg: string = String(e);
+}
+```
+
+## 五、CPython 嵌入详解
+
+### 5.1 为什么选择嵌入 CPython 而非模拟执行
+
+早期版本使用 ArkTS 编写的 Python 模拟器（`PythonSimulator.ets`），但模拟器存在明显局限：
+
+| 对比项 | ArkTS 模拟器 | CPython 嵌入 |
+|--------|-------------|--------------|
+| 语法支持 | 基础（print/变量/循环） | 完整 Python 语法 |
+| f-string | 不支持 | 支持 |
+| 列表推导式 | 部分支持 | 完整支持 |
+| 标准库 | 无 | 33 内置 + 64 共享模块 |
+| 错误栈 | 简单提示 | 完整 traceback |
+| 执行速度 | 慢 | 原生速度 |
+
+因此 T1 阶段引入了真正的 CPython 引擎。
+
+### 5.2 Python C API 调用流程
+
+嵌入 CPython 的核心流程：
+
+```cpp
+// 1. 初始化（只执行一次）
+Py_Initialize();
+
+// 2. 获取主模块的全局字典
+PyObject* mainModule = PyImport_AddModule("__main__");
+PyObject* globalDict = PyModule_GetDict(mainModule);
+
+// 3. 执行 Python 代码字符串
+PyObject* result = PyRun_String(
+    code,
+    Py_file_input,   // 文件模式（可执行多行）
+    globalDict,
+    globalDict
+);
+
+// 4. 从全局字典读取变量
+PyObject* output = PyDict_GetItemString(globalDict, "_output");
+
+// 5. 转换为 C 字符串
+const char* text = PyUnicode_AsUTF8(output);
+
+// 6. 清理
+Py_DECREF(result);
+Py_Finalize();
+```
+
+### 5.3 输出捕获原理
+
+CPython 默认将 `print()` 输出到系统 stdout，但在 HarmonyOS 应用中没有终端。因此需要用 Python 的 `io.StringIO` 重定向输出：
+
+```python
+import sys, io
+_capturer = io.StringIO()
+_old_stdout = sys.stdout
+sys.stdout = _capturer        # 重定向 print 输出
+
+exec(user_code, {'__name__': '__main__'})
+
+sys.stdout = _old_stdout      # 恢复输出
+_output = _capturer.getvalue()  # 获取捕获的内容
+```
+
+同样地，`sys.stderr` 也被重定向，这样异常堆栈也能被捕获并显示在终端面板。
+
+### 5.4 Base64 编码的作用
+
+用户代码中可能包含引号、三引号、换行等特殊字符，直接拼接进 Python 字符串会破坏转义。解决办法是先做 Base64 编码：
+
+```cpp
+// C++ 端编码
+std::string encoded = base64Encode(userCode);
+
+// 生成的 Python 脚本中解码
+"_code = base64.b64decode('" + encoded + "').decode('utf-8')"
+```
+
+这样无论用户代码包含什么字符，都能安全传递。
+
+## 六、性能优化
+
+### 6.1 异步执行避免 UI 卡顿
+
+Python 代码可能执行很长时间，如果在 ArkUI 主线程运行会导致界面冻结。解决方案是将执行放到后台线程：
+
+```typescript
+// 伪代码：异步执行
+this.isRunning = true;
+// 切换到后台任务执行
+let output: string = await runPythonAsync(code);
+// 回到主线程更新 UI
+this.consoleEntries = formatOutput(output);
+this.isRunning = false;
+```
+
+### 6.2 动态库加载优化
+
+`libpython3.13.so` 约 20MB，首次加载较慢。优化措施：
+
+- 使用 `IMPORTED` 方式链接，避免重复打包
+- Python 引擎只初始化一次（使用 `g_isPythonInitialized` 标志）
+- 后续运行代码直接复用已初始化的解释器
+
+```cpp
+static bool g_isPythonInitialized = false;
+
+if (!g_isPythonInitialized) {
+    Py_Initialize();
+    g_isPythonInitialized = true;
+}
+```
+
+### 6.3 行号同步显示
+
+代码编辑器需要行号随代码滚动同步。实现方式是将行号列与 TextArea 放在同一 Row 中，行号高度根据字体大小动态计算：
+
+```typescript
+Row() {
+  // 行号列
+  Column() {
+    ForEach(this.codeLines, (_line: string, idx: number) => {
+      Text((idx + 1).toString())
+        .fontSize(this.settings.fontSize - 2)
+        .height(this.settings.fontSize * 1.6)
+    })
+  }
+  .width(48)
+
+  // 代码编辑区
+  TextArea({ text: this.editorContent })
+    .layoutWeight(1)
+}
+```
+
+## 七、PC 适配要点
+
+### 9.1 设备类型声明
 
 在 `module.json5` 中声明支持 2in1（PC）设备：
 
@@ -218,7 +392,7 @@ EricPC/
 "deviceTypes": ["phone", "2in1"]
 ```
 
-### 5.2 布局适配参数
+### 9.2 布局适配参数
 
 | 区域 | 宽度 | 高度 | 说明 |
 |------|------|------|------|
@@ -228,7 +402,7 @@ EricPC/
 | 底部面板 | 100% | 180px | 可折叠 |
 | 状态栏 | 100% | 22px | 固定底部 |
 
-### 5.3 原生库加载
+### 9.3 原生库加载
 
 鸿蒙PC 设备使用 arm64 架构，`libpython3.13.so` 需要放置在 `entry/libs/arm64-v8a/` 目录下。CMake 构建时通过相对路径引用：
 
@@ -244,9 +418,9 @@ target_link_libraries(entry PUBLIC
 )
 ```
 
-## 六、功能演示
+## 八、功能演示
 
-### 6.1 运行 Hello World
+### 8.1 运行 Hello World
 
 在编辑器中输入：
 
@@ -264,7 +438,7 @@ print("Eric6 IDE is running on OpenHarmony")
 ✓ 运行完成 | 输出 2 行 | 耗时 16ms
 ```
 
-### 6.2 运行函数和循环
+### 8.2 运行函数和循环
 
 ```python
 def factorial(n):
@@ -286,9 +460,9 @@ for i in range(5):
 [5] factorial(4) = 24
 ```
 
-## 七、遇到的问题与解决方案
+## 九、遇到的问题与解决方案
 
-### 7.1 Python.h 找不到
+### 9.1 Python.h 找不到
 
 **问题**：C++ 编译时报 `Python.h: No such file or directory`
 
@@ -300,13 +474,13 @@ include_directories(
 )
 ```
 
-### 7.2 libpython3.13.so 加载失败
+### 9.2 libpython3.13.so 加载失败
 
 **问题**：运行时提示 `cannot load library`
 
 **解决**：确保 `.so` 文件位于 `entry/libs/arm64-v8a/` 目录下，且 CMake 中使用相对路径引用。
 
-### 7.3 ArkTS 组件 @Prop 与 @Link 的区别
+### 9.3 ArkTS 组件 @Prop 与 @Link 的区别
 
 **问题**：子组件不响应父组件状态变化
 
@@ -324,7 +498,7 @@ BottomPanel({ consoleEntries: $consoleEntries })
 @Link consoleEntries: ConsoleEntry[]
 ```
 
-## 八、构建与运行
+## 十、构建与运行
 
 要求 DevEco Studio、HarmonyOS SDK 6.0.2/API 22 和 Native SDK。
 
@@ -351,7 +525,7 @@ entry/build/default/outputs/default/entry-default-signed.hap
 
 详细编译说明请参考 [README.OpenHarmony_CN.md](README.OpenHarmony_CN.md)。
 
-## 九、代码托管
+## 十一、代码托管
 
 项目代码托管于 **AtomGit**：
 
@@ -362,11 +536,78 @@ entry/build/default/outputs/default/entry-default-signed.hap
 git clone https://atomgit.com/zl2222/EricIDE.git
 ```
 
-## 十、总结
+## 十二、踩坑经验总结
+
+在整个移植过程中，我们遇到了不少问题，这里整理出最有代表性的几个，供后来者参考。
+
+### 12.1 交叉编译的坑
+
+**问题**：`configure` 阶段报 `checking for sqlite3 >= 3.15.2... no`，导致 `_sqlite3` 模块缺失。
+
+**原因**：交叉编译时找不到目标平台的 sqlite3 库，`configure` 会自动跳过。
+
+**解决**：对于 IDE 场景，sqlite3 并非必需。通过 `ac_cv_*` 变量跳过不必要的检查：
+
+```bash
+./configure     ac_cv_file__dev_ptmx=yes     ac_cv_file__dev_ptc=no     ac_cv_header_libintl_h=no
+```
+
+### 12.2 动态库路径的坑
+
+**问题**：CMake 中写绝对路径 `/Users/xxx/.../libpython3.13.so`，别人拉取代码后编译失败。
+
+**原因**：绝对路径只在原作者机器上有效。
+
+**解决**：改用相对路径，基于 `CMAKE_CURRENT_SOURCE_DIR` 计算：
+
+```cmake
+IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/../../../../libs/arm64-v8a/libpython3.13.so"
+```
+
+### 12.3 ArkTS 作用域的坑
+
+**问题**：`Cannot find name 'lastBracketCol'`。
+
+**原因**：变量在 for 循环内声明，但在循环外使用。ArkTS 的块级作用域检查比普通 TypeScript 更严格。
+
+**解决**：将变量声明提升到函数级别。
+
+## 十三、总结与展望
+
+### 13.1 成果回顾
 
 本文介绍了将开源 Eric6 IDE 移植到开源鸿蒙PC 平台的完整技术方案。通过 ArkTS UI 复刻、CPython 3.13 交叉编译、NAPI 桥接三层架构，实现了在鸿蒙PC 上编写和运行 Python 代码的能力。
 
-项目代码已开源在 AtomGit，欢迎社区开发者参与贡献。
+核心成果：
+
+- **完整的 IDE 界面**：14 个 ArkTS 组件，1:1 复刻 Eric6 布局
+- **真实的 Python 执行**：内嵌 CPython 3.13，支持完整语法和标准库
+- **稳定的桥接层**：NAPI + Base64 编码，安全传递任意代码
+- **PC 适配**：支持 2in1 设备形态，布局自适应
+
+### 13.2 未来规划
+
+| 方向 | 内容 | 优先级 |
+|------|------|--------|
+| 文件持久化 | 使用 HarmonyOS 分布式文件系统保存项目 | 高 |
+| 调试器 | 断点、单步执行、变量查看 | 高 |
+| 多语言 | 集成 Ruby、JavaScript 运行时 | 中 |
+| 插件系统 | 支持自定义扩展 | 中 |
+| 性能 | 优化启动速度和内存占用 | 中 |
+
+### 13.3 社区贡献
+
+项目代码已开源在 AtomGit，欢迎社区开发者参与贡献。无论是修复 Bug、完善文档，还是提交新功能，都非常欢迎。
+
+贡献方式：
+
+1. Fork 本仓库
+2. 创建功能分支：`git checkout -b feature/xxx`
+3. 提交改动：`git commit -m "feat: xxx"`
+4. 推送分支：`git push origin feature/xxx`
+5. 创建 Pull Request
+
+**欢迎加入开源鸿蒙PC社区，一起推动开源软件在鸿蒙生态的落地！**
 
 ---
 

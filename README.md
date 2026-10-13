@@ -437,7 +437,7 @@ print("Eric6 IDE is running on OpenHarmony")
 [2] Eric6 IDE is running on OpenHarmony
 ✓ 运行完成 | 输出 2 行 | 耗时 16ms
 ```
-
+![image.png](https://raw.atomgit.com/user-images/assets/10556976/e05e7eca-e722-4b9c-a7c0-d562ca5551a3/image.png 'image.png')
 ### 8.2 运行函数和循环
 
 ```python
@@ -459,7 +459,7 @@ for i in range(5):
 [4] factorial(3) = 6
 [5] factorial(4) = 24
 ```
-
+![image.png](https://raw.atomgit.com/user-images/assets/10556976/32d900d7-dbbd-4331-b4d9-f65f0a067572/image.png 'image.png')
 ## 九、遇到的问题与解决方案
 
 ### 9.1 Python.h 找不到
@@ -473,7 +473,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/python3.13
 )
 ```
-
+![image.png](https://raw.atomgit.com/user-images/assets/10556976/8f8e8b41-3746-4d0d-9456-60a7db0a894e/image.png 'image.png')
 ### 9.2 libpython3.13.so 加载失败
 
 **问题**：运行时提示 `cannot load library`
@@ -613,7 +613,7 @@ IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/../../../../libs/arm64-v8a/libpyt
 
 **参考资料：**
 
-- [OpenHarmony 官方文档](https://gitee.com/openharmony/docs)
+
 - [Eric6 IDE 官网](https://eric-ide.sourceforge.net/)
 - [eric-ide-zh_CN 中文项目](https://github.com/suifengtec/eric-ide-zh_CN)
 - [CPython 官方仓库](https://github.com/python/cpython)

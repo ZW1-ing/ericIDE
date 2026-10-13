@@ -1,105 +1,159 @@
-# EricPC - HarmonyOS Eric6 IDE 复刻版
+# EricPC — 开源鸿蒙PC版 Eric6 IDE
 
-基于 HarmonyOS ArkTS 开发的 Eric6 IDE 鸸蒙移植版，复刻了开源项目 [eric-ide-zh_CN](https://github.com/suifengtec/eric-ide-zh_CN) 的完整 UI 和功能。
+> EricPC 是将开源 Python/Ruby IDE「Eric6」移植到开源鸿蒙PC（OpenHarmony 2in1）平台的项目。
+
+**欢迎加入开源鸿蒙PC社区：https://harmonypc.csdn.net/**
+
+**欢迎在PC社区平台申请新建项目：https://atomgit.com/OpenHarmonyPCDeveloper**
+
+---
 
 ## 项目简介
 
-EricPC 是一个运行在 HarmonyOS 设备上的轻量级代码编辑器/IDE，采用类似 VS Code 的现代 IDE 布局，支持 Python 代码的编辑和模拟运行。
+EricPC 采用三层架构，将 Eric6 的完整 IDE 体验带到鸿蒙桌面端：
+
+| 层 | 技术 | 说明 |
+|----|------|------|
+| UI 层 | ArkTS / ArkUI | 复刻 Eric6 完整 IDE 布局 |
+| 桥接层 | C++ / NAPI | ArkTS ↔ CPython 双向通信 |
+| 引擎层 | CPython 3.13 | 交叉编译 for aarch64-linux-ohos |
+
+## 软件迁移能力（T0 / T1 / T2 阶段）
+
+本项目按照三个阶段推进软件迁移：
+
+### T0 阶段：UI 复刻 — ✅ 已完成
+
+- 完整的 Eric6 风格 IDE 布局（14 个 ArkTS 组件）
+- 标题栏、菜单栏、工具栏、活动栏、侧边栏、编辑区、终端面板、状态栏
+- ArkTS 端 Python 模拟器（支持 print、变量、函数、循环、条件）
+- 文件树管理、标签页管理、撤销/重做、剪贴板
+
+### T1 阶段：原生引擎集成 — ✅ 已完成
+
+- CPython 3.13 for aarch64-linux-ohos 交叉编译成功
+- NAPI 桥接层实现 ArkTS ↔ CPython 双向通信
+- Base64 编码安全传递代码，支持 f-string、列表推导式等复杂语法
+- 真实 Python 代码执行，输出捕获并显示在终端面板
+
+### T2 阶段：完整 IDE 功能 — 🔄 进行中
+
+- 文件持久化（HarmonyOS 分布式文件系统）
+- 调试器（断点、单步执行、变量查看）
+- 插件系统
+- Ruby 运行时集成
 
 ## 功能特性
 
 ### 界面布局
-- **标题栏** - 深灰色背景，绿色 ERIC6 标志，窗口控制按钮
-- **菜单栏** - 文件(F)、编辑(E)、搜索(U)、视图(V)、调试(D)、帮助(H)
-- **工具栏** - 运行/停止、新建/打开/保存、撤销/重做、剪切/复制/粘贴、搜索
-- **活动栏** - 左侧窄条，文件/搜索/Git/调试/扩展 图标
-- **侧边栏** - EXPLORER 文件树，支持文件夹展开/折叠
-- **编辑区** - 标签页管理，行号显示，代码编辑
-- **终端面板** - 终端/输出/问题/调试控制台，运行结果展示
-- **状态栏** - 蓝色底栏，显示语言、文件名、光标位置、编码、版本
+- **标题栏** — 深灰色背景，绿色 ERIC6 标志，窗口控制按钮
+- **菜单栏** — 文件(F)、编辑(E)、搜索(U)、视图(V)、调试(D)、帮助(H)
+- **工具栏** — 运行/停止、新建/保存、撤销/重做、剪切/复制/粘贴、搜索
+- **活动栏** — 左侧窄条（48px），图标顶部对齐
+- **侧边栏** — EXPLORER 文件树，支持文件夹展开/折叠
+- **编辑区** — 标签页管理，行号同步显示
+- **终端面板** — 终端/输出/问题/调试控制台，运行结果展示
+- **状态栏** — 蓝色底栏，语言、文件名、光标位置、编码、版本
 
 ### 核心功能
-- 📝 **代码编辑** - TextArea 代码输入，支持多文件标签页
-- ▶️ **代码运行** - Python 模拟器，点击运行按钮即可执行代码
-- 📁 **文件管理** - 文件树浏览，新建/保存/另存为/关闭文件
-- ↩️ **撤销/重做** - 完整的编辑历史管理
-- 🔍 **搜索** - 全局搜索功能
-- 🐍 **Python 模拟器** - 支持 print、变量、函数、循环、条件、列表推导式等
-- 🐛 **错误提示** - 语法错误、运行时错误的友好提示
-- 📋 **终端输出** - 带行号的格式化输出，区分信息/输出/错误/系统消息
+- 📝 **代码编辑** — TextArea 代码输入，支持多文件标签页
+- ▶️ **代码运行** — CPython 3.13 原生引擎执行，点击运行按钮即可
+- 📁 **文件管理** — 文件树浏览，新建/保存/另存为/关闭文件
+- ↩️ **撤销/重做** — 完整的编辑历史管理
+- 🔍 **搜索** — 全局搜索功能
+- 🐍 **Python 支持** — print、变量、函数、循环、条件、列表推导式、f-string
+- 🐛 **错误提示** — 语法错误、运行时错误的友好提示
+- 📋 **终端输出** — 带行号的格式化输出，区分信息/输出/错误/系统消息
 
 ## 项目结构
 
 ```
-EricPC_MVP2/
+EricPC/
 ├── entry/src/main/ets/
-│   ├── pages/
-│   │   ├── Index.ets              # 主页面入口
-│   │   ├── TitleBar.ets           # 标题栏
-│   │   ├── MenuBar.ets            # 菜单栏
-│   │   ├── ToolBar.ets            # 工具栏
-│   │   ├── ActivityBar.ets        # 活动栏
-│   │   ├── SideBar.ets            # 侧边栏（文件树）
-│   │   ├── TabBar.ets             # 标签栏
-│   │   ├── CodeEditor.ets         # 代码编辑器
-│   │   ├── BottomPanel.ets        # 底部终端面板
-│   │   ├── RightPanel.ets         # 右侧面板
-│   │   ├── StatusBar.ets          # 状态栏
-│   │   ├── Overlays.ets           # 搜索面板
-│   │   ├── EditorPanel.ets        # 编辑器面板
-│   │   ├── DeleteDialog.ets       # 删除确认对话框
-│   │   └── RenameDialog.ets       # 重命名对话框
+│   ├── pages/                    # ArkTS UI 组件（14 个）
+│   │   ├── Index.ets            # 主页面入口
+│   │   ├── TitleBar.ets         # 标题栏
+│   │   ├── MenuBar.ets          # 菜单栏
+│   │   ├── ToolBar.ets          # 工具栏
+│   │   ├── ActivityBar.ets      # 活动栏
+│   │   ├── SideBar.ets          # 侧边栏（文件树）
+│   │   ├── TabBar.ets           # 标签栏
+│   │   ├── CodeEditor.ets       # 代码编辑器
+│   │   ├── BottomPanel.ets      # 终端面板
+│   │   ├── RightPanel.ets       # 右侧面板
+│   │   ├── StatusBar.ets        # 状态栏
+│   │   ├── Overlays.ets         # 搜索面板
+│   │   ├── DeleteDialog.ets     # 删除对话框
+│   │   └── RenameDialog.ets     # 重命名对话框
 │   ├── models/
-│   │   └── IDEModels.ets          # 数据模型定义
-│   ├── utils/
-│   │   ├── FileManager.ets        # 文件管理
-│   │   ├── PythonSimulator.ets    # Python 模拟执行器
-│   │   ├── RunHandler.ets         # 运行处理器
-│   │   ├── TabManager.ets         # 标签页管理
-│   │   ├── UndoManager.ets        # 撤销/重做管理
-│   │   ├── ClipboardManager.ets   # 剪贴板管理
-│   │   ├── DialogManager.ets      # 对话框管理
-│   │   ├── ActionRouter.ets       # 动作路由
-│   │   ├── SettingsManager.ets    # 设置管理
-│   │   └── SyntaxHighlighter.ets  # 语法高亮
-│   └── entryability/
-│       └── EntryAbility.ets       # 应用入口
-├── entry/src/main/cpp/            # C++ 原生代码
-└── AppScope/                      # 应用配置
+│   │   └── IDEModels.ets        # 数据模型
+│   └── utils/                    # 工具类
+│       ├── FileManager.ets      # 文件管理
+│       ├── PythonSimulator.ets  # ArkTS 端模拟器（备用）
+│       ├── RunHandler.ets       # 运行处理器
+│       ├── TabManager.ets       # 标签管理
+│       ├── UndoManager.ets      # 撤销/重做
+│       └── SyntaxHighlighter.ets # 语法高亮
+├── entry/src/main/cpp/
+│   ├── napi_init.cpp            # NAPI 桥接（核心）
+│   ├── CMakeLists.txt           # C++ 构建脚本
+│   └── include/python3.13/      # Python 头文件
+├── entry/libs/arm64-v8a/
+│   └── libpython3.13.so         # 交叉编译的 Python 引擎
+└── docs/
+    └── article.md               # 项目技术文章
 ```
-
-## 技术栈
-
-- **开发语言**: ArkTS (HarmonyOS)
-- **UI 框架**: ArkUI 声明式 UI
-- **运行环境**: HarmonyOS 设备/模拟器
-- **Python 引擎**: 内置 Python 模拟器（支持基本语法）
 
 ## 快速开始
 
-1. 使用 DevEco Studio 打开项目
-2. 连接 HarmonyOS 设备或启动模拟器
-3. 点击运行按钮部署应用
-4. 在编辑器中编写 Python 代码
-5. 点击绿色 ▶ 按钮运行代码
-6. 在底部终端查看运行结果
+### 环境要求
 
-## 内置示例代码
+| 项目 | 要求 |
+|------|------|
+| IDE | DevEco Studio 5.0+ |
+| SDK | HarmonyOS 6.0.2 (API 22) |
+| Native SDK | 必须安装 |
+| 设备 | 鸿蒙PC / 2in1 设备或模拟器 |
 
-项目包含多个 Python 示例文件：
-- `main.py` - 主程序（问候、阶乘、斐波那契）
-- `utils.py` - 工具函数（单词计数、字符串反转）
-- `hello.py` - Hello World 示例
-- `math_demo.py` - 数学运算演示
-- `data_demo.py` - 数据结构演示
-- `loop_demo.py` - 循环演示
-- `condition_demo.py` - 条件判断演示
+### 编译运行
+
+1. 克隆代码：
+```bash
+git clone https://atomgit.com/zl2222/EricIDE.git
+cd EricIDE
+```
+
+2. 使用 DevEco Studio 打开项目
+3. 连接鸿蒙PC 设备或 2in1 模拟器
+4. 点击 ▶ 运行
+
+详细编译说明请参考 [README.OpenHarmony_CN.md](README.OpenHarmony_CN.md)。
+
+## 代码托管
+
+项目代码托管于 **AtomGit**：
+
+- **仓库地址**：https://atomgit.com/zl2222/EricIDE
+- **镜像地址**：https://github.com/ZW1-ing/ericIDE
+
+## 技术栈
+
+| 技术 | 说明 |
+|------|------|
+| 开发语言 | ArkTS (TypeScript) |
+| UI 框架 | ArkUI 声明式 UI |
+| 原生代码 | C++ (NAPI 桥接) |
+| Python 引擎 | CPython 3.13 (arm64) |
+| 构建工具 | hvigor + CMake |
+| 目标平台 | HarmonyOS Phone / 2in1 (PC) |
 
 ## 参考项目
 
-- [eric-ide-zh_CN](https://github.com/suifengtec/eric-ide-zh_CN) - Eric6 IDE 中文语言包
-- [Eric6 IDE](https://eric-ide.sourceforge.net/) - 原版 Eric6 IDE
+- [eric-ide-zh_CN](https://github.com/suifengtec/eric-ide-zh_CN) — Eric6 IDE 中文语言包
+- [Eric6 IDE](https://eric-ide.sourceforge.net/) — 原版 Eric6 IDE
 
-## 许可证
+## 社区
 
-本项目仅供学习交流使用。
+**欢迎加入开源鸿蒙PC社区：https://harmonypc.csdn.net/**
+
+**欢迎在PC社区平台申请新建项目：https://atomgit.com/OpenHarmonyPCDeveloper**

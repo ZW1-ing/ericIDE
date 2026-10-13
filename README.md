@@ -101,7 +101,7 @@ EricPC/
 ├── entry/libs/arm64-v8a/
 │   └── libpython3.13.so         # 交叉编译的 Python 引擎
 └── docs/
-    └── article.md               # 项目技术文章
+    └── README.md                # 项目技术文章
 ```
 
 ## 快速开始

@@ -1,15 +1,15 @@
-# 欢迎加入开源鸿蒙PC社区
+
+
+---
+
+# 开源鸿蒙PC移植实战：Eric IDE登陆鸿蒙桌面端
+
+> **摘要**：本文记录了将开源 Python/Ruby IDE「Eric」移植到开源鸿蒙PC平台的完整过程。项目采用 ArkTS 复刻 Eric6 的完整 IDE 布局，通过交叉编译 CPython 3.13 for aarch64-linux-ohos，并使用 NAPI 桥接层实现 ArkTS 与 CPython 引擎的双向通信。目前项目已支持代码编辑、文件管理、Python 真实执行等核心功能，运行于鸿蒙PC（2in1设备）上。代码托管于 AtomGit。
+#欢迎加入开源鸿蒙PC社区
 
 **欢迎加入开源鸿蒙PC社区：https://harmonypc.csdn.net/**
 
 **欢迎在PC社区平台申请新建项目：https://atomgit.com/OpenHarmonyPCDeveloper**
-
----
-
-# 开源鸿蒙PC移植实战：Eric6 IDE登陆鸿蒙桌面端
-
-> **摘要**：本文记录了将开源 Python/Ruby IDE「Eric6」移植到开源鸿蒙PC平台的完整过程。项目采用 ArkTS 复刻 Eric6 的完整 IDE 布局，通过交叉编译 CPython 3.13 for aarch64-linux-ohos，并使用 NAPI 桥接层实现 ArkTS 与 CPython 引擎的双向通信。目前项目已支持代码编辑、文件管理、Python 真实执行等核心功能，运行于鸿蒙PC（2in1设备）上。代码托管于 AtomGit。
-
 ## 软件迁移能力与阶段划分（T0 / T1 / T2）
 
 本项目将开源桌面 IDE 的迁移过程拆分为三个可验收阶段，便于社区协作、问题定位和后续发布：
@@ -48,9 +48,9 @@ Eric6 是一款基于 PyQt5 的开源 Python/Ruby 集成开发环境（IDE），
 
 **开源鸿蒙PC** 作为 HarmonyOS 生态的重要组成部分，基于 OpenHarmony 内核，支持 2in1 设备形态。将传统桌面端 IDE 移植到鸿蒙PC，不仅能够丰富鸿蒙桌面生态，也为开发者提供了在鸿蒙平台上编写和运行 Python 代码的能力。
 
-### 1.1 为什么选择 Eric6
+### 1.1 为什么选择 Eric
 
-| 特性 | Eric6 | VS Code | PyCharm |
+| 特性 | Eric | VS Code | PyCharm |
 |------|-------|---------|---------|
 | 体积 | 极小（< 5MB） | 中等（~100MB） | 极大（> 1GB） |
 | 启动速度 | 毫秒级 | 秒级 | 十秒级 |
@@ -58,7 +58,7 @@ Eric6 是一款基于 PyQt5 的开源 Python/Ruby 集成开发环境（IDE），
 | Ruby支持 | 原生 | 插件 | 不支持 |
 | 移植难度 | 低 | 中 | 高 |
 
-Eric6 的简洁架构使其成为移植到鸿蒙PC 的理想选择。
+Eric 的简洁架构使其成为移植到鸿蒙PC 的理想选择。
 
 ## 二、技术架构
 
@@ -77,7 +77,7 @@ Eric6 的简洁架构使其成为移植到鸿蒙PC 的理想选择。
 └─────────────────────────────────────┘
 ```
 
-### 2.1 UI 层：ArkTS 复刻 Eric6 布局
+### 2.1 UI 层：ArkTS 复刻 Eric 布局
 
 UI 层使用 ArkTS（HarmonyOS 的声明式 UI 框架）完整复刻了 Eric6 的 IDE 布局：
 
@@ -469,7 +469,7 @@ print("Eric6 IDE is running on OpenHarmony")
 [2] Eric6 IDE is running on OpenHarmony
 ✓ 运行完成 | 输出 2 行 | 耗时 16ms
 ```
-
+![image.png](https://raw.atomgit.com/user-images/assets/10556976/e05e7eca-e722-4b9c-a7c0-d562ca5551a3/image.png 'image.png')
 ### 8.2 运行函数和循环
 
 ```python
@@ -491,7 +491,7 @@ for i in range(5):
 [4] factorial(3) = 6
 [5] factorial(4) = 24
 ```
-
+![image.png](https://raw.atomgit.com/user-images/assets/10556976/32d900d7-dbbd-4331-b4d9-f65f0a067572/image.png 'image.png')
 ## 九、遇到的问题与解决方案
 
 ### 9.1 Python.h 找不到
@@ -505,7 +505,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/python3.13
 )
 ```
-
+![image.png](https://raw.atomgit.com/user-images/assets/10556976/8f8e8b41-3746-4d0d-9456-60a7db0a894e/image.png 'image.png')
 ### 9.2 libpython3.13.so 加载失败
 
 **问题**：运行时提示 `cannot load library`
@@ -645,7 +645,7 @@ IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/../../../../libs/arm64-v8a/libpyt
 
 **参考资料：**
 
-- [OpenHarmony 官方文档](https://gitee.com/openharmony/docs)
+
 - [Eric6 IDE 官网](https://eric-ide.sourceforge.net/)
 - [eric-ide-zh_CN 中文项目](https://github.com/suifengtec/eric-ide-zh_CN)
 - [CPython 官方仓库](https://github.com/python/cpython)
